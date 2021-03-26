@@ -37,10 +37,10 @@ import ROOT
 # --------------------------------------------
 
 # Default settings for command line arguments
-DEFAULT_OUTFNAME         = "skimmedJpt20to50Eta2p4.20140606.13.00_PileUpStudies_rev360973.PythJ1and2mc12aJETMET.jetmet2012pileupcustom.kNN100trimmed.nPUtrkCorrJVF_RpT.JHStrkPtSumGE0.root"
-DEFAULT_INFNAME          = "/atlas/local/pnef//Pileup/Data/skimmedJpt20to50Eta2p4.20140606.13.00_PileUpStudies_rev360973.PythJ1and2mc12aJETMET.jetmet2012pileupcustom.root"
-DEFAULT_TREESIG          = "JetTree0"
-DEFAULT_TREEBKG          = "JetTree0"
+DEFAULT_OUTFNAME         = "Retrained_PFlow_TVA0_JZ1_JZ2_20_pt_60_eta_2_5.root" #"skimmedJpt20to50Eta2p4.20140606.13.00_PileUpStudies_rev360973.PythJ1and2mc12aJETMET.jetmet2012pileupcustom.kNN100trimmed.nPUtrkCorrJVF_RpT.JHStrkPtSumGE0.root"
+DEFAULT_INFNAME          = "/eos/user/t/tingebre/JVT_ReTraining_Trees/outfileRT_PFlow_JZ1_JZ2_0_Pt_60_TVA0_nFiles1k.root"#"/atlas/local/pnef//Pileup/Data/skimmedJpt20to50Eta2p4.20140606.13.00_PileUpStudies_rev360973.PythJ1and2mc12aJETMET.jetmet2012pileupcustom.root"
+DEFAULT_TREESIG          = "ReTrainingTree"#"JetTree0"
+DEFAULT_TREEBKG          = "ReTrainingTree"#"JetTree0"
 #DEFAULT_METHODS          = "kNN100trim,likelihood,BDT"
 DEFAULT_METHODS          = "kNN100trim,likelihood"
 DEFAULT_NEVENTS_TEST_S   =0
@@ -48,12 +48,11 @@ DEFAULT_NEVENTS_TEST_B   =0
 DEFAULT_NEVENTS_TRAIN_S  =0  
 DEFAULT_NEVENTS_TRAIN_B  =0
 
-VARIABLES             = ["corrJVF_RootCore", "RpT_RootCore"]
-SELECTION             = "fabs(Jeta)<2.4 && Jpt>20 && Jpt<50 && RpT_RootCore<2 && VtxDzTruth<0.1 && RpT_RootCore>0"
-SPECTATORS            = ["NPV", "Mu" ,"Jpt", "Jeta", "JisPU", "JisHS", "Weight", "VtxDzTruth", "Jtruthpt",
-                         "JJVF", "JCorrPUtrkPtSumOverPt", "nPUTracks"]
+VARIABLES             = ["corrJVF","RpT"]#["corrJVF_RootCore", "RpT_RootCore"]
+SELECTION             = "fabs(Jeta)< 2.5 && Jpt>20 && Jpt<60 && RpT<2 && RpT>0" #"fabs(Jeta)<2.5 && Jpt>20 && Jpt<50 && RpT_RootCore<2 && VtxDzTruth<0.1 && RpT_RootCore>0"
+SPECTATORS            = ["NPV", "Mu" ,"Jpt", "Jeta", "JisPU", "JisHS", "Weight"]#["NPV", "Mu" ,"Jpt", "Jeta", "JisPU", "JisHS", "Weight", "VtxDzTruth", "Jtruthpt","JJVF", "JCorrPUtrkPtSumOverPt", "nPUTracks"]
 IsOLD                 = False
-doJTruthMatchPt10Cut  = True
+doJTruthMatchPt10Cut  = False
 
 
 # Print usage help ------------------------------------------------------------------
@@ -156,7 +155,7 @@ def main():
     # Set verbosity
     factory.SetVerbose( verbose )
 
-
+    
     # Adjust variables if old sample is used
     if IsOLD:
         SPECTATORS.remove("JisPU")
@@ -166,9 +165,11 @@ def main():
     
     # Define the input variables that shall be used for the classifier training
     # note that you may also use variable expressions, such as: "3*var1/var2*abs(var3)"
-    theCat1Vars = ""; theCat2Vars = ""; theCat3Vars = ""; 
+    theCat1Vars = ""; theCat2Vars = ""; theCat3Vars = "";
+    dataloader = TMVA.DataLoader("dataset")
     for var in VARIABLES:
-        factory.AddVariable( var, 'F')
+        dataloader.AddVariable( var, 'F')
+        #factory.AddVariable( var, 'F')
         theCat1Vars+=var+":"
         theCat2Vars+=var+":"
         theCat3Vars+=var+":"
@@ -181,7 +182,8 @@ def main():
 
     # You can add so-called "Spectator variables", which are not used in the MVA training, 
     for spect in SPECTATORS:
-        factory.AddSpectator( spect, spect)
+        #factory.AddSpectator( spect, spect)
+        dataloader.AddSpectator( spect, spect)
 
     # Apply additional cuts on the signal and background sample. 
     mycutSig = ""
@@ -197,6 +199,7 @@ def main():
 
     # open file
     input = TFile.Open( infname )
+    print ('Input file = ', infname)
 
     # Get the signal and background trees for training
     signal      = input.Get( treeNameSig )
@@ -207,8 +210,12 @@ def main():
     backgroundWeight = 1.0
 
     # ====== register trees ====================================================
-    factory.AddSignalTree    ( signal,     signalWeight     )
-    factory.AddBackgroundTree( background, backgroundWeight )
+    #factory.AddSignalTree    ( signal,     signalWeight     )
+    #factory.AddBackgroundTree( background, backgroundWeight )
+    
+    dataloader.AddSignalTree    ( signal,     signalWeight     )
+    dataloader.AddBackgroundTree( background, backgroundWeight )
+
 
     # To give different trees for training and testing, do as follows:
     #    factory.AddSignalTree( signalTrainingTree, signalTrainWeight, "Training" )
@@ -227,7 +234,8 @@ def main():
                             ":nTest_Signal="+str(DEFAULT_NEVENTS_TEST_S)+\
                             ":nTest_Background="+str(DEFAULT_NEVENTS_TEST_B)+\
                             ":SplitMode=Random:NormMode=EqualNumEvents:!V"
-    factory.PrepareTrainingAndTestTree( mycutSig, mycutBkg, TrainingAndTestTreeStr)
+    #factory.PrepareTrainingAndTestTree( mycutSig, mycutBkg, TrainingAndTestTreeStr)
+    dataloader.PrepareTrainingAndTestTree( mycutSig, mycutBkg, TrainingAndTestTreeStr)
 
     # --------------------------------------------------------------------------------------------------
 
@@ -236,19 +244,25 @@ def main():
 
     # multidim likelihood --- kNN
     if "kNN100" in mlist:
-        factory.BookMethod( TMVA.Types.kKNN, "KNN100",
+        #factory.BookMethod( TMVA.Types.kKNN, "KNN100",
+         #       "!V:H:nkNN=100:ScaleFrac=0.8:UseKernel=F:UseWeight=F:Trim=False:BalanceDepth=6" )
+        factory.BookMethod( dataloader,TMVA.Types.kKNN, "KNN100",
                 "!V:H:nkNN=100:ScaleFrac=0.8:UseKernel=F:UseWeight=F:Trim=False:BalanceDepth=6" )
     
     if "kNN100trim" in mlist:
-        factory.BookMethod( TMVA.Types.kKNN, "KNN100trim",
+        #factory.BookMethod( TMVA.Types.kKNN, "KNN100trim",
+         #       "!V:H:nkNN=100:ScaleFrac=0.8:UseKernel=F:UseWeight=F:Trim=True:BalanceDepth=6" )
+        factory.BookMethod(dataloader, TMVA.Types.kKNN, "KNN100trim",
                 "!V:H:nkNN=100:ScaleFrac=0.8:UseKernel=F:UseWeight=F:Trim=True:BalanceDepth=6" )
-        
+       
     if "likelihood" in mlist:
-        factory.BookMethod( TMVA.Types.kLikelihood, "Likelihood","H:!V:" );
+        #factory.BookMethod( TMVA.Types.kLikelihood, "Likelihood","H:!V:" );
+        factory.BookMethod( dataloader,TMVA.Types.kLikelihood, "Likelihood","H:!V:" );
     
     if "BDT" in mlist:
         BDToptions = "!H:NTrees=850:nEventsMin=150:MaxDepth=5:BoostType=AdaBoost:AdaBoostBeta=0.5:SeparationType=GiniIndex:nCuts=20:PruneMethod=NoPruning:VerbosityLevel=Error"
-        factory.BookMethod( TMVA.Types.kBDT, "BDT",BDToptions)
+        #factory.BookMethod( TMVA.Types.kBDT, "BDT",BDToptions)
+        factory.BookMethod( dataloader,TMVA.Types.kBDT, "BDT",BDToptions)
     
     # ---- Now you can tell the factory to train, test, and evaluate the MVAs. 
     # Train MVAs
